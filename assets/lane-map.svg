@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-label="Stylized mid lane reminder map">
+  <defs>
+    <linearGradient id="ground" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#1d251d"/>
+      <stop offset="0.52" stop-color="#2b2d22"/>
+      <stop offset="1" stop-color="#171d1a"/>
+    </linearGradient>
+    <linearGradient id="river" x1="0" x2="1" y1="1" y2="0">
+      <stop offset="0" stop-color="#25495a"/>
+      <stop offset="1" stop-color="#4f8fa0"/>
+    </linearGradient>
+    <filter id="soft">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="360" rx="18" fill="url(#ground)"/>
+  <path d="M-10 275C160 238 241 196 381 151C542 100 670 59 970 24V93C763 122 647 158 512 205C332 267 173 310-10 345Z" fill="#26351f" opacity=".9"/>
+  <path d="M-22 80C173 123 277 165 435 220C602 278 720 307 982 323V256C745 236 631 201 503 153C351 96 197 58-22 16Z" fill="#3a2b25" opacity=".72"/>
+  <path d="M-30 218C160 200 257 197 395 181C578 159 714 117 990 110V171C757 182 620 213 441 238C267 263 133 260-30 282Z" fill="url(#river)" opacity=".82"/>
+  <path d="M62 286L881 51" stroke="#d8c27a" stroke-width="19" stroke-linecap="round" opacity=".16"/>
+  <path d="M78 281L865 56" stroke="#f2bc57" stroke-width="5" stroke-linecap="round" opacity=".66"/>
+  <path d="M210 242C273 214 336 197 399 188" stroke="#61d394" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <path d="M563 139C622 119 686 102 759 91" stroke="#ea6f63" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <circle cx="435" cy="180" r="46" fill="#68c7d8" opacity=".16" filter="url(#soft)"/>
+  <circle cx="435" cy="180" r="13" fill="#68c7d8"/>
+  <circle cx="399" cy="197" r="11" fill="#f2bc57"/>
+  <circle cx="552" cy="146" r="11" fill="#f2bc57"/>
+  <circle cx="206" cy="242" r="16" fill="#61d394"/>
+  <circle cx="760" cy="91" r="16" fill="#ea6f63"/>
+  <path d="M206 242L399 197L552 146L760 91" fill="none" stroke="#f4f1e8" stroke-width="2" stroke-dasharray="8 12" opacity=".52"/>
+  <g fill="#f4f1e8" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="24">
+    <text x="178" y="294">00:05</text>
+    <text x="374" y="244">01:30</text>
+    <text x="523" y="123">06:00</text>
+    <text x="723" y="62">12:00</text>
+  </g>
+</svg>
