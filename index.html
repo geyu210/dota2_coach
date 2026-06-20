@@ -57,12 +57,36 @@
           </label>
         </div>
 
-        <div class="sync-row" aria-label="时间同步">
-          <label>
+        <div class="sync-panel" aria-label="时间同步">
+          <div class="sync-head">
             <span>同步本局时间</span>
-            <input id="syncTimeInput" inputmode="numeric" value="00:00" />
-          </label>
-          <button class="secondary-button" id="syncTimeButton" type="button">同步</button>
+            <button class="secondary-button" id="syncTimeButton" type="button">按选择同步</button>
+          </div>
+          <div class="time-picker">
+            <div class="phase-toggle" aria-label="同步时间阶段">
+              <button class="phase-button is-active" id="syncBeforeButton" type="button">赛前</button>
+              <button class="phase-button" id="syncAfterButton" type="button">赛后</button>
+            </div>
+            <label>
+              <span>分钟</span>
+              <input id="syncMinuteInput" type="number" inputmode="numeric" min="0" max="180" step="1" value="1" />
+            </label>
+            <label>
+              <span>秒</span>
+              <input id="syncSecondInput" type="number" inputmode="numeric" min="0" max="59" step="1" value="30" />
+            </label>
+          </div>
+          <div class="quick-time-grid" aria-label="常用同步时间">
+            <button class="chip-button" type="button" data-sync-time="-90">-01:30</button>
+            <button class="chip-button" type="button" data-sync-time="-60">-01:00</button>
+            <button class="chip-button" type="button" data-sync-time="-30">-00:30</button>
+            <button class="chip-button" type="button" data-sync-time="0">00:00</button>
+            <button class="chip-button" type="button" data-sync-time="35">00:35</button>
+            <button class="chip-button" type="button" data-sync-time="95">01:35</button>
+            <button class="chip-button" type="button" data-sync-time="170">02:50</button>
+            <button class="chip-button" type="button" data-sync-time="410">06:50</button>
+            <button class="chip-button" type="button" data-sync-time="420">07:00</button>
+          </div>
         </div>
 
         <div class="lane-visual" aria-hidden="true">
@@ -91,10 +115,40 @@
         </section>
 
         <form class="editor" id="reminderForm">
-          <label>
-            <span>时间</span>
-            <input id="timeInput" name="time" inputmode="numeric" placeholder="01:30" required />
-          </label>
+          <div class="time-editor">
+            <span class="field-label">时间</span>
+            <input id="timeInput" name="time" type="hidden" value="00:05" />
+            <div class="time-picker compact">
+              <div class="phase-toggle" aria-label="提醒时间阶段">
+                <button class="phase-button" id="reminderBeforeButton" type="button">赛前</button>
+                <button class="phase-button is-active" id="reminderAfterButton" type="button">赛后</button>
+              </div>
+              <label>
+                <span>分钟</span>
+                <input id="reminderMinuteInput" type="number" inputmode="numeric" min="0" max="180" step="1" value="0" />
+              </label>
+              <label>
+                <span>秒</span>
+                <input id="reminderSecondInput" type="number" inputmode="numeric" min="0" max="59" step="1" value="5" />
+              </label>
+            </div>
+            <div class="quick-time-grid compact" aria-label="常用提醒时间">
+              <button class="chip-button" type="button" data-reminder-time="-10">-00:10</button>
+              <button class="chip-button" type="button" data-reminder-time="5">00:05</button>
+              <button class="chip-button" type="button" data-reminder-time="35">00:35</button>
+              <button class="chip-button" type="button" data-reminder-time="110">01:50</button>
+              <button class="chip-button" type="button" data-reminder-time="170">02:50</button>
+              <button class="chip-button" type="button" data-reminder-time="330">05:30</button>
+              <button class="chip-button" type="button" data-reminder-time="410">06:50</button>
+              <button class="chip-button" type="button" data-reminder-time="720">12:00</button>
+            </div>
+            <div class="time-stepper" aria-label="微调提醒时间">
+              <button class="chip-button" type="button" data-reminder-step="-10">-10秒</button>
+              <button class="chip-button" type="button" data-reminder-step="10">+10秒</button>
+              <button class="chip-button" type="button" data-reminder-step="30">+30秒</button>
+              <button class="chip-button" type="button" data-reminder-step="60">+1分</button>
+            </div>
+          </div>
           <label>
             <span>内容</span>
             <input id="messageInput" name="message" maxlength="60" required />

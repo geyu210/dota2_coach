@@ -5,9 +5,10 @@ A static browser timer for Dota 2 lane reminders.
 ## Features
 
 - Start, pause, resume, and reset a match timer.
-- Sync the timer to an in-game time such as `06:49`.
+- Start from Dota 2's `-01:30` pre-game countdown.
+- Sync the timer with common time buttons such as `-01:30`, `00:00`, `00:35`, or `06:50`.
 - Switch between mid-lane and side-lane preset schedules.
-- Edit reminder times and messages directly on the page.
+- Edit reminder times with minute / second controls instead of typing colons.
 - Choose a custom voice for each reminder.
 - Use bundled project voices from the `assets` folder.
 - Import local audio files into the browser voice library.

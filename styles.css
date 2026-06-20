@@ -204,23 +204,105 @@ h3 {
   gap: 10px;
 }
 
-.sync-row {
+.sync-panel {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 96px;
   gap: 10px;
-  max-width: 360px;
+  max-width: 560px;
   margin-top: 12px;
 }
 
-.sync-row label {
+.sync-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sync-head > span,
+.section-label,
+.field-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.time-picker {
   display: grid;
+  grid-template-columns: auto minmax(86px, 0.42fr) minmax(86px, 0.42fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.time-picker.compact {
+  grid-template-columns: auto minmax(82px, 0.38fr) minmax(82px, 0.38fr);
+}
+
+.time-picker label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.time-picker label > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.phase-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(56px, 1fr));
+  gap: 4px;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #151713;
+  padding: 4px;
+}
+
+.phase-button,
+.chip-button {
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ink);
+}
+
+.phase-button {
+  background: transparent;
+  color: var(--muted);
+}
+
+.phase-button.is-active {
+  background: var(--green);
+  color: #0c1710;
+  font-weight: 800;
+}
+
+.quick-time-grid,
+.time-stepper {
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-.sync-row span,
-.section-label {
+.quick-time-grid.compact,
+.time-stepper {
+  margin-top: 2px;
+}
+
+.chip-button {
+  min-width: 64px;
+  background: #252a22;
+  border-color: #3f463a;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0 9px;
+}
+
+.chip-button:hover,
+.chip-button:focus-visible {
+  border-color: var(--green);
+  color: var(--ink);
 }
 
 .primary-button,
@@ -307,9 +389,20 @@ h3 {
 
 .editor {
   display: grid;
-  grid-template-columns: 88px minmax(170px, 1fr) minmax(140px, 0.72fr) 74px 86px;
+  grid-template-columns: minmax(170px, 1fr) minmax(140px, 0.72fr) 74px 86px;
   gap: 10px;
   margin: 18px 0 16px;
+}
+
+.time-editor {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #1a1d18;
+  padding: 10px;
 }
 
 .preset-panel {
@@ -538,15 +631,21 @@ button:focus-visible {
 
   .editor,
   .preset-panel,
-  .sync-row,
+  .sync-head,
+  .time-picker,
   .list-head,
   .reminder-row,
   .voice-row {
     grid-template-columns: 1fr;
   }
 
+  .sync-head,
   .preset-actions {
     flex-wrap: wrap;
+  }
+
+  .phase-toggle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .list-head {

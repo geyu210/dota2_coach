@@ -1,6 +1,9 @@
-const CONFIG_VERSION = 5;
-const STORAGE_KEY = "dota2-coach-state-v5";
+const CONFIG_VERSION = 6;
+const MATCH_START_SECONDS = -90;
+const INITIAL_REMINDER_SECONDS = 5;
+const STORAGE_KEY = "dota2-coach-state-v6";
 const LEGACY_STORAGE_KEYS = [
+  "dota2-coach-state-v5",
   "dota2-coach-state-v4",
   "dota2-coach-state-v3",
   "dota2-coach-state-v2",
@@ -150,12 +153,14 @@ const state = {
   running: false,
   paused: false,
   alertsEnabled: true,
-  elapsedBeforeRun: 0,
+  elapsedBeforeRun: MATCH_START_SECONDS,
   startedAt: 0,
   firedIds: new Set(),
   editingId: null,
   audioContext: null,
   activeAudio: null,
+  syncTimeSign: -1,
+  reminderTimeSign: 1,
   reminderRenderKey: "",
   voiceRenderKey: "",
 };
@@ -168,11 +173,21 @@ const elements = {
   pauseButton: document.querySelector("#pauseButton"),
   resetButton: document.querySelector("#resetButton"),
   enabledSwitch: document.querySelector("#enabledSwitch"),
-  syncTimeInput: document.querySelector("#syncTimeInput"),
+  syncBeforeButton: document.querySelector("#syncBeforeButton"),
+  syncAfterButton: document.querySelector("#syncAfterButton"),
+  syncMinuteInput: document.querySelector("#syncMinuteInput"),
+  syncSecondInput: document.querySelector("#syncSecondInput"),
   syncTimeButton: document.querySelector("#syncTimeButton"),
+  syncQuickButtons: document.querySelectorAll("[data-sync-time]"),
   reminderList: document.querySelector("#reminderList"),
   reminderForm: document.querySelector("#reminderForm"),
   timeInput: document.querySelector("#timeInput"),
+  reminderBeforeButton: document.querySelector("#reminderBeforeButton"),
+  reminderAfterButton: document.querySelector("#reminderAfterButton"),
+  reminderMinuteInput: document.querySelector("#reminderMinuteInput"),
+  reminderSecondInput: document.querySelector("#reminderSecondInput"),
+  reminderQuickButtons: document.querySelectorAll("[data-reminder-time]"),
+  reminderStepButtons: document.querySelectorAll("[data-reminder-step]"),
   messageInput: document.querySelector("#messageInput"),
   voiceSelect: document.querySelector("#voiceSelect"),
   reminderEnabledInput: document.querySelector("#reminderEnabledInput"),
@@ -362,7 +377,7 @@ function sanitizeReminders(items, options = {}) {
         voiceId: resolveVoiceId(item, message, options.shouldAutoAssignVoices),
       };
     })
-    .filter((reminder) => Number.isFinite(reminder.seconds) && reminder.seconds >= 0 && reminder.message);
+    .filter((reminder) => Number.isFinite(reminder.seconds) && reminder.message);
 }
 
 function resolveVoiceId(reminder, message, shouldAutoAssignVoices) {
@@ -412,16 +427,18 @@ function elapsedSeconds() {
 }
 
 function formatTime(totalSeconds) {
-  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const seconds = safeSeconds % 60;
+  const wholeSeconds = Math.trunc(totalSeconds);
+  const sign = wholeSeconds < 0 ? "-" : "";
+  const absoluteSeconds = Math.abs(wholeSeconds);
+  const hours = Math.floor(absoluteSeconds / 3600);
+  const minutes = Math.floor((absoluteSeconds % 3600) / 60);
+  const seconds = absoluteSeconds % 60;
 
   if (hours > 0) {
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    return `${sign}${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
   }
 
-  return `${pad(minutes)}:${pad(seconds)}`;
+  return `${sign}${pad(minutes)}:${pad(seconds)}`;
 }
 
 function pad(value) {
@@ -429,9 +446,12 @@ function pad(value) {
 }
 
 function parseTime(value) {
-  const parts = value.trim().split(":");
+  const normalized = value.trim();
+  const sign = normalized.startsWith("-") ? -1 : 1;
+  const timeValue = normalized.replace(/^[+-]/, "");
+  const parts = timeValue.split(":");
   if (parts.length !== 2 && parts.length !== 3) {
-    throw new Error("时间格式用 01:30 或 01:02:03");
+    throw new Error("时间格式用 01:30、-01:30 或 01:02:03");
   }
 
   const numbers = parts.map((part) => {
@@ -447,7 +467,101 @@ function parseTime(value) {
     throw new Error("分钟和秒数不能超过 59");
   }
 
-  return hours * 3600 + minutes * 60 + seconds;
+  return sign * (hours * 3600 + minutes * 60 + seconds);
+}
+
+function pickerControls(kind) {
+  if (kind === "sync") {
+    return {
+      beforeButton: elements.syncBeforeButton,
+      afterButton: elements.syncAfterButton,
+      minuteInput: elements.syncMinuteInput,
+      secondInput: elements.syncSecondInput,
+    };
+  }
+
+  return {
+    beforeButton: elements.reminderBeforeButton,
+    afterButton: elements.reminderAfterButton,
+    minuteInput: elements.reminderMinuteInput,
+    secondInput: elements.reminderSecondInput,
+  };
+}
+
+function pickerSign(kind) {
+  return kind === "sync" ? state.syncTimeSign : state.reminderTimeSign;
+}
+
+function setPickerSign(kind, sign) {
+  if (kind === "sync") {
+    state.syncTimeSign = sign < 0 ? -1 : 1;
+  } else {
+    state.reminderTimeSign = sign < 0 ? -1 : 1;
+  }
+
+  const controls = pickerControls(kind);
+  const isBefore = pickerSign(kind) < 0;
+  controls.beforeButton.classList.toggle("is-active", isBefore);
+  controls.afterButton.classList.toggle("is-active", !isBefore);
+  if (kind === "reminder") {
+    updateReminderTimeInput();
+  }
+}
+
+function normalizeNumberInput(input, min, max) {
+  const value = Math.trunc(Number(input.value));
+  const safeValue = Number.isFinite(value) ? value : min;
+  const clampedValue = Math.min(max, Math.max(min, safeValue));
+  input.value = String(clampedValue);
+  return clampedValue;
+}
+
+function pickerSeconds(kind) {
+  const controls = pickerControls(kind);
+  const minutes = normalizeNumberInput(controls.minuteInput, 0, 180);
+  const seconds = normalizeNumberInput(controls.secondInput, 0, 59);
+  const totalSeconds = minutes * 60 + seconds;
+  return pickerSign(kind) < 0 && totalSeconds !== 0 ? -totalSeconds : totalSeconds;
+}
+
+function setPickerSeconds(kind, totalSeconds) {
+  const controls = pickerControls(kind);
+  const wholeSeconds = Math.trunc(totalSeconds);
+  const absoluteSeconds = Math.abs(wholeSeconds);
+  setPickerSign(kind, wholeSeconds < 0 ? -1 : 1);
+  controls.minuteInput.value = String(Math.floor(absoluteSeconds / 60));
+  controls.secondInput.value = String(absoluteSeconds % 60);
+  if (kind === "reminder") {
+    updateReminderTimeInput();
+  }
+}
+
+function adjustReminderTime(deltaSeconds) {
+  setPickerSeconds("reminder", pickerSeconds("reminder") + deltaSeconds);
+}
+
+function updateReminderTimeInput() {
+  elements.timeInput.value = formatTime(pickerSeconds("reminder"));
+}
+
+function syncToSeconds(seconds) {
+  state.running = true;
+  state.paused = false;
+  state.elapsedBeforeRun = Math.trunc(seconds);
+  state.startedAt = performance.now();
+  markPastRemindersFired(state.elapsedBeforeRun);
+  hideToast();
+  setPickerSeconds("sync", state.elapsedBeforeRun);
+  render(true);
+}
+
+function isEditingSyncTime() {
+  return [
+    elements.syncBeforeButton,
+    elements.syncAfterButton,
+    elements.syncMinuteInput,
+    elements.syncSecondInput,
+  ].includes(document.activeElement);
 }
 
 function openDatabase() {
@@ -535,29 +649,14 @@ async function replaceVoiceLibrary(voices) {
 function startMatch() {
   state.running = true;
   state.paused = false;
-  state.elapsedBeforeRun = 0;
+  state.elapsedBeforeRun = MATCH_START_SECONDS;
   state.startedAt = performance.now();
   state.firedIds.clear();
   render(true);
 }
 
 function syncMatchTime() {
-  let seconds;
-  try {
-    seconds = parseTime(elements.syncTimeInput.value);
-  } catch (error) {
-    showInlineMessage(error.message);
-    elements.syncTimeInput.focus();
-    return;
-  }
-
-  state.running = true;
-  state.paused = false;
-  state.elapsedBeforeRun = seconds;
-  state.startedAt = performance.now();
-  markPastRemindersFired(seconds);
-  hideToast();
-  render(true);
+  syncToSeconds(pickerSeconds("sync"));
 }
 
 function markPastRemindersFired(seconds) {
@@ -587,7 +686,7 @@ function togglePause() {
 function resetMatch() {
   state.running = false;
   state.paused = false;
-  state.elapsedBeforeRun = 0;
+  state.elapsedBeforeRun = MATCH_START_SECONDS;
   state.startedAt = 0;
   state.firedIds.clear();
   hideToast();
@@ -733,14 +832,7 @@ function showInlineMessage(message) {
 function upsertReminder(event) {
   event.preventDefault();
 
-  let seconds;
-  try {
-    seconds = parseTime(elements.timeInput.value);
-  } catch (error) {
-    showInlineMessage(error.message);
-    elements.timeInput.focus();
-    return;
-  }
+  const seconds = pickerSeconds("reminder");
 
   const message = elements.messageInput.value.trim();
   if (!message) {
@@ -772,7 +864,7 @@ function upsertReminder(event) {
     state.firedIds.delete(payload.id);
   }
   elements.reminderForm.reset();
-  elements.timeInput.value = formatTime(seconds);
+  setPickerSeconds("reminder", seconds);
   elements.voiceSelect.value = payload.voiceId;
   elements.reminderEnabledInput.checked = true;
   elements.saveReminderButton.textContent = "新增";
@@ -787,7 +879,7 @@ function editReminder(id) {
   }
 
   state.editingId = reminder.id;
-  elements.timeInput.value = formatTime(reminder.seconds);
+  setPickerSeconds("reminder", reminder.seconds);
   elements.messageInput.value = reminder.message;
   elements.voiceSelect.value = findVoice(reminder.voiceId) ? reminder.voiceId : "";
   elements.reminderEnabledInput.checked = reminder.enabled;
@@ -801,6 +893,7 @@ function removeReminder(id) {
   if (state.editingId === id) {
     state.editingId = null;
     elements.reminderForm.reset();
+    setPickerSeconds("reminder", INITIAL_REMINDER_SECONDS);
     elements.saveReminderButton.textContent = "新增";
   }
   saveState();
@@ -821,7 +914,7 @@ function resetDefaults() {
   state.firedIds.clear();
   state.editingId = null;
   elements.reminderForm.reset();
-  elements.timeInput.value = "00:05";
+  setPickerSeconds("reminder", INITIAL_REMINDER_SECONDS);
   elements.messageInput.value = "按 Ctrl + F1 编队";
   elements.voiceSelect.value = "";
   elements.reminderEnabledInput.checked = true;
@@ -839,7 +932,7 @@ function applyPreset(presetName) {
   }
   state.editingId = null;
   elements.reminderForm.reset();
-  elements.timeInput.value = "00:05";
+  setPickerSeconds("reminder", INITIAL_REMINDER_SECONDS);
   elements.messageInput.value = "按 Ctrl + F1 编队";
   elements.voiceSelect.value = "";
   elements.reminderEnabledInput.checked = true;
@@ -1126,15 +1219,19 @@ function formatBytes(bytes) {
 
 function renderProgress() {
   const reminders = sortedReminders().filter((reminder) => reminder.enabled);
-  const maxSeconds = Math.max(...reminders.map((reminder) => reminder.seconds), 1);
-  const progress = Math.min(100, (elapsedSeconds() / maxSeconds) * 100);
+  const elapsed = elapsedSeconds();
+  const timelineStart = Math.min(MATCH_START_SECONDS, elapsed, ...reminders.map((reminder) => reminder.seconds));
+  const timelineEnd = Math.max(1, elapsed, ...reminders.map((reminder) => reminder.seconds));
+  const timelineRange = Math.max(1, timelineEnd - timelineStart);
+  const progress = Math.min(100, Math.max(0, ((elapsed - timelineStart) / timelineRange) * 100));
 
   elements.progressFill.style.width = `${progress}%`;
   elements.progressMarkers.replaceChildren(
     ...reminders.map((reminder) => {
       const marker = document.createElement("span");
       marker.className = "marker";
-      marker.style.left = `${Math.min(100, (reminder.seconds / maxSeconds) * 100)}%`;
+      const left = ((reminder.seconds - timelineStart) / timelineRange) * 100;
+      marker.style.left = `${Math.min(100, Math.max(0, left))}%`;
       return marker;
     }),
   );
@@ -1151,8 +1248,8 @@ function render(forceList = false) {
   elements.pauseButton.textContent = state.paused ? "继续" : "暂停";
   elements.pauseButton.disabled = !state.running;
   elements.enabledSwitch.checked = state.alertsEnabled;
-  if (document.activeElement !== elements.syncTimeInput) {
-    elements.syncTimeInput.value = formatTime(elapsed);
+  if (!isEditingSyncTime()) {
+    setPickerSeconds("sync", elapsed);
   }
 
   renderVoiceSelect();
@@ -1171,11 +1268,32 @@ function bindEvents() {
   elements.pauseButton.addEventListener("click", togglePause);
   elements.resetButton.addEventListener("click", resetMatch);
   elements.syncTimeButton.addEventListener("click", syncMatchTime);
-  elements.syncTimeInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      syncMatchTime();
-    }
+  elements.syncBeforeButton.addEventListener("click", () => setPickerSign("sync", -1));
+  elements.syncAfterButton.addEventListener("click", () => setPickerSign("sync", 1));
+  elements.syncMinuteInput.addEventListener("change", () => pickerSeconds("sync"));
+  elements.syncSecondInput.addEventListener("change", () => pickerSeconds("sync"));
+  [elements.syncMinuteInput, elements.syncSecondInput].forEach((input) => {
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        syncMatchTime();
+      }
+    });
+  });
+  elements.syncQuickButtons.forEach((button) => {
+    button.addEventListener("click", () => syncToSeconds(Number(button.dataset.syncTime)));
+  });
+  elements.reminderBeforeButton.addEventListener("click", () => setPickerSign("reminder", -1));
+  elements.reminderAfterButton.addEventListener("click", () => setPickerSign("reminder", 1));
+  elements.reminderMinuteInput.addEventListener("input", updateReminderTimeInput);
+  elements.reminderSecondInput.addEventListener("input", updateReminderTimeInput);
+  elements.reminderMinuteInput.addEventListener("change", updateReminderTimeInput);
+  elements.reminderSecondInput.addEventListener("change", updateReminderTimeInput);
+  elements.reminderQuickButtons.forEach((button) => {
+    button.addEventListener("click", () => setPickerSeconds("reminder", Number(button.dataset.reminderTime)));
+  });
+  elements.reminderStepButtons.forEach((button) => {
+    button.addEventListener("click", () => adjustReminderTime(Number(button.dataset.reminderStep)));
   });
   elements.enabledSwitch.addEventListener("change", () => {
     state.alertsEnabled = elements.enabledSwitch.checked;
@@ -1212,9 +1330,9 @@ async function init() {
     state.voices = sortedVoicesByName(BUNDLED_VOICES);
   }
 
-  elements.timeInput.value = "00:05";
+  setPickerSeconds("sync", MATCH_START_SECONDS);
+  setPickerSeconds("reminder", INITIAL_REMINDER_SECONDS);
   elements.messageInput.value = "按 Ctrl + F1 编队";
-  elements.syncTimeInput.value = "00:00";
 
   bindEvents();
   render(true);
