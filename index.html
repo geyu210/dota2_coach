@@ -10,18 +10,18 @@
     <title>Dota2 Coach</title>
     <link rel="icon" href="assets/lane-map.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="preload" as="audio" href="assets/按 control 加 f1 编队.wav" />
-    <link rel="preload" as="audio" href="assets/中路买假眼.wav" />
-    <link rel="preload" as="audio" href="assets/中路神符快要刷新.wav" />
-    <link rel="preload" as="audio" href="assets/中路神符已经刷新.wav" />
-    <link rel="preload" as="audio" href="assets/中路六分钟神符马上刷新。.wav" />
-    <link rel="preload" as="audio" href="assets/准备拉野。.wav" />
-    <link rel="preload" as="audio" href="assets/准备拉野！中路六分钟神符马上刷新。.wav" />
-    <link rel="preload" as="audio" href="assets/莲花马上刷新.wav" />
-    <link rel="preload" as="audio" href="assets/莲花已经刷新.wav" />
-    <link rel="preload" as="audio" href="assets/经验符马上刷新，请注意！.wav" />
-    <link rel="preload" as="audio" href="assets/经验符已经刷新.wav" />
-    <link rel="preload" as="audio" href="assets/赏金符快刷新.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/按 control 加 f1 编队.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/中路买假眼.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/中路神符快要刷新.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/中路神符已经刷新.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/中路六分钟神符马上刷新。.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/准备拉野。.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/准备拉野！中路六分钟神符马上刷新。.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/莲花马上刷新.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/莲花已经刷新.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/经验符马上刷新，请注意！.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/经验符已经刷新.wav" />
+    <link rel="preload" as="audio" type="audio/wav" href="assets/赏金符快刷新.wav" />
   </head>
   <body>
     <main class="app-shell">
@@ -80,10 +80,10 @@
               </div>
               <button class="primary-button sync-action" id="syncTimeButton" type="button">立即同步</button>
             </div>
-            <div class="quick-time-grid" aria-label="常用同步时间">
-              <button class="chip-button" type="button" data-sync-time="-60">-01:00</button>
-              <button class="chip-button" type="button" data-sync-time="-30">-00:30</button>
-              <button class="chip-button" type="button" data-sync-time="-15">-00:15</button>
+            <div class="quick-time-grid" aria-label="减少同步时间">
+              <button class="chip-button" type="button" data-sync-step="-60">-01:00</button>
+              <button class="chip-button" type="button" data-sync-step="-30">-00:30</button>
+              <button class="chip-button" type="button" data-sync-step="-15">-00:15</button>
             </div>
             <div class="time-stepper sync-stepper" aria-label="微调同步时间">
               <button class="chip-button" type="button" data-sync-step="30">+30秒</button>

@@ -1,8 +1,9 @@
-const CONFIG_VERSION = 7;
+const CONFIG_VERSION = 8;
 const MATCH_START_SECONDS = -90;
 const INITIAL_REMINDER_SECONDS = 5;
-const STORAGE_KEY = "dota2-coach-state-v7";
+const STORAGE_KEY = "dota2-coach-state-v8";
 const LEGACY_STORAGE_KEYS = [
+  "dota2-coach-state-v7",
   "dota2-coach-state-v6",
   "dota2-coach-state-v5",
   "dota2-coach-state-v4",
@@ -169,6 +170,7 @@ const state = {
   audioContext: null,
   activeAudio: null,
   activeBufferSource: null,
+  audioPrimed: false,
   audioPrepared: false,
   voicePreloadPromise: null,
   voiceBuffers: new Map(),
@@ -193,7 +195,6 @@ const elements = {
   syncMinuteInput: document.querySelector("#syncMinuteInput"),
   syncSecondInput: document.querySelector("#syncSecondInput"),
   syncTimeButton: document.querySelector("#syncTimeButton"),
-  syncQuickButtons: document.querySelectorAll("[data-sync-time]"),
   syncStepButtons: document.querySelectorAll("[data-sync-step]"),
   reminderList: document.querySelector("#reminderList"),
   reminderForm: document.querySelector("#reminderForm"),
@@ -579,6 +580,7 @@ function syncToSeconds(seconds) {
   markPastRemindersFired(state.elapsedBeforeRun);
   hideToast();
   setPickerSeconds("sync", state.elapsedBeforeRun);
+  prepareUpcomingAudio();
   render(true);
 }
 
@@ -680,11 +682,19 @@ function startMatch() {
   state.elapsedBeforeRun = MATCH_START_SECONDS;
   state.startedAt = performance.now();
   state.firedIds.clear();
+  prepareUpcomingAudio();
   render(true);
 }
 
 function syncMatchTime() {
   syncToSeconds(pickerSeconds("sync"));
+}
+
+function prepareUpcomingAudio() {
+  const next = nextReminder();
+  if (next?.voiceId) {
+    prepareAudio({ priorityVoiceId: next.voiceId });
+  }
 }
 
 function markPastRemindersFired(seconds) {
@@ -833,6 +843,26 @@ async function resumeAudioContext() {
   return context;
 }
 
+function primeAudioOutput(context) {
+  if (!context || state.audioPrimed) {
+    return;
+  }
+
+  try {
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    source.buffer = context.createBuffer(1, 1, 22050);
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(context.destination);
+    source.start(0);
+    source.stop(context.currentTime + 0.01);
+    state.audioPrimed = true;
+  } catch {
+    // Some browsers only allow priming after the audio context has resumed.
+  }
+}
+
 function playBufferedVoice(voiceId) {
   const buffer = state.voiceBuffers.get(voiceId);
   const context = getAudioContext();
@@ -906,12 +936,23 @@ function playTone() {
 }
 
 function prepareAudio(options = {}) {
-  const { announce = false } = options;
+  const { announce = false, priorityVoiceId = "" } = options;
   state.audioPrepared = true;
-  resumeAudioContext().catch(() => {});
+  const context = getAudioContext();
+  primeAudioOutput(context);
+  resumeAudioContext()
+    .then((resumedContext) => primeAudioOutput(resumedContext))
+    .catch(() => {});
+
+  if (priorityVoiceId && !state.voiceBuffers.has(priorityVoiceId)) {
+    const priorityVoice = findVoice(priorityVoiceId);
+    if (priorityVoice) {
+      preloadVoice(priorityVoice).catch(() => {});
+    }
+  }
 
   if (!state.voicePreloadPromise) {
-    state.voicePreloadPromise = preloadVoices();
+    state.voicePreloadPromise = preloadVoices(priorityVoiceId);
   }
 
   if (announce) {
@@ -928,8 +969,10 @@ function prepareAudio(options = {}) {
   return state.voicePreloadPromise;
 }
 
-async function preloadVoices() {
-  const voices = sortedVoices().filter((voice) => voiceSource(voice));
+async function preloadVoices(priorityVoiceId = "") {
+  const voices = sortedVoices()
+    .filter((voice) => voiceSource(voice))
+    .sort((a, b) => Number(b.id === priorityVoiceId) - Number(a.id === priorityVoiceId));
   if (!voices.length) {
     return 0;
   }
@@ -1036,6 +1079,22 @@ async function enableBrowserNotifications() {
 
   const permission = await Notification.requestPermission();
   showInlineMessage(permission === "granted" ? "浏览器通知已开启" : "浏览器通知未开启");
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") {
+    return;
+  }
+
+  const register = () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  };
+
+  if (document.readyState === "complete") {
+    register();
+  } else {
+    window.addEventListener("load", register, { once: true });
+  }
 }
 
 function showInlineMessage(message) {
@@ -1512,9 +1571,6 @@ function bindEvents() {
       }
     });
   });
-  elements.syncQuickButtons.forEach((button) => {
-    button.addEventListener("click", () => syncToSeconds(Number(button.dataset.syncTime)));
-  });
   elements.syncStepButtons.forEach((button) => {
     button.addEventListener("click", () => adjustSyncTime(Number(button.dataset.syncStep)));
   });
@@ -1572,6 +1628,7 @@ async function init() {
 
   bindEvents();
   render(true);
+  registerServiceWorker();
   window.setInterval(tick, 250);
 }
 
