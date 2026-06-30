@@ -66,7 +66,7 @@ button:disabled {
 .timer-panel {
   position: relative;
   overflow: hidden;
-  padding: 24px;
+  padding: 18px;
 }
 
 .settings-panel {
@@ -128,13 +128,22 @@ h3 {
   margin: 24px 0;
 }
 
+.home-stack {
+  display: grid;
+  gap: 10px;
+}
+
 .clock-block,
 .next-block {
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(23, 24, 22, 0.78);
-  padding: 18px;
+  padding: 14px;
+}
+
+.primary-clock {
+  padding: 14px 16px 16px;
 }
 
 .clock-label {
@@ -147,7 +156,7 @@ h3 {
 #clock {
   display: block;
   font-variant-numeric: tabular-nums;
-  font-size: clamp(3.8rem, 8vw, 6rem);
+  font-size: clamp(3.45rem, 8vw, 5.7rem);
   line-height: 0.9;
 }
 
@@ -166,7 +175,7 @@ h3 {
 }
 
 .progress-wrap {
-  margin: 8px 0 22px;
+  margin: 0;
 }
 
 .progress-track {
@@ -204,11 +213,55 @@ h3 {
   gap: 10px;
 }
 
+.home-control-panel,
+.primary-sync {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #1a1d18;
+  padding: 10px;
+}
+
+.route-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.route-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.route-actions .secondary-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.primary-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(104px, auto) 44px;
+  gap: 8px;
+}
+
+.primary-controls .primary-button,
+.primary-controls .secondary-button,
+.primary-controls .icon-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.primary-controls .switch {
+  justify-content: center;
+  min-width: 0;
+}
+
 .sync-panel {
   display: grid;
   gap: 10px;
-  max-width: 560px;
-  margin-top: 12px;
+  max-width: none;
+  margin-top: 0;
 }
 
 .sync-head {
@@ -230,6 +283,18 @@ h3 {
   grid-template-columns: auto minmax(86px, 0.42fr) minmax(86px, 0.42fr);
   gap: 8px;
   align-items: end;
+}
+
+.sync-pick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(108px, 0.32fr);
+  align-items: end;
+  gap: 8px;
+}
+
+.sync-action {
+  width: 100%;
+  min-width: 0;
 }
 
 .time-picker.compact {
@@ -289,6 +354,11 @@ h3 {
   margin-top: 2px;
 }
 
+.sync-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .chip-button {
   min-width: 64px;
   background: #252a22;
@@ -326,6 +396,13 @@ h3 {
   min-width: 96px;
   background: #32392e;
   border-color: #4b5447;
+}
+
+.secondary-button.is-active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #0c1710;
+  font-weight: 800;
 }
 
 .ghost-button {
@@ -373,7 +450,7 @@ h3 {
 }
 
 .lane-visual {
-  margin-top: 22px;
+  margin-top: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #151713;
@@ -426,6 +503,19 @@ h3 {
 .preset-actions {
   display: flex;
   gap: 8px;
+}
+
+.route-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.secondary-status {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .editor label:not(.check-row) {
@@ -622,16 +712,67 @@ button:focus-visible {
   .app-shell {
     width: min(100vw - 20px, 1180px);
     padding: 10px 0;
+    gap: 12px;
   }
 
   .timer-panel,
   .settings-panel {
-    padding: 14px;
+    padding: 10px;
+  }
+
+  .primary-clock {
+    padding: 12px;
+  }
+
+  #clock {
+    font-size: clamp(3rem, 16vw, 4.5rem);
+  }
+
+  .route-panel {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .primary-controls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .primary-controls .switch {
+    grid-column: span 2;
+  }
+
+  .primary-controls .icon-button {
+    width: 100%;
+  }
+
+  .sync-pick-row {
+    grid-template-columns: minmax(0, 1fr) minmax(96px, 0.32fr);
+  }
+
+  .primary-sync .time-picker {
+    grid-template-columns: minmax(94px, 1fr) minmax(64px, 0.55fr) minmax(64px, 0.55fr);
+  }
+
+  .quick-time-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .chip-button {
+    min-width: 0;
+    width: 100%;
+    padding: 0 6px;
+  }
+
+  .secondary-status {
+    grid-template-columns: 1fr;
+  }
+
+  .lane-visual {
+    display: none;
   }
 
   .editor,
   .preset-panel,
-  .sync-head,
   .time-picker,
   .list-head,
   .reminder-row,

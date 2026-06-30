@@ -14,78 +14,85 @@
   <body>
     <main class="app-shell">
       <section class="timer-panel" aria-labelledby="app-title">
-        <div class="topbar">
-          <div>
-            <p class="eyebrow">Dota2 Coach</p>
-            <h1 id="app-title">Dota2 提醒计时器</h1>
-          </div>
-          <button class="icon-button" id="soundButton" type="button" title="浏览器通知">
-            <svg aria-hidden="true" viewBox="0 0 24 24" class="button-icon">
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-              <path d="M10 21h4" />
-            </svg>
-            <span class="sr-only">浏览器通知</span>
-          </button>
-        </div>
+        <h1 id="app-title" class="sr-only">Dota2 Coach</h1>
 
-        <div class="timer-grid">
-          <div class="clock-block" aria-live="polite">
+        <div class="home-stack">
+          <div class="clock-block primary-clock" aria-live="polite">
             <span class="clock-label">本局时间</span>
             <strong id="clock">00:00</strong>
           </div>
+
+          <section class="home-control-panel route-panel" aria-label="路线预设">
+            <span class="section-label">路线</span>
+            <div class="preset-actions route-actions">
+              <button class="secondary-button" id="midPresetButton" type="button">中路</button>
+              <button class="secondary-button" id="sidePresetButton" type="button">边路</button>
+            </div>
+          </section>
+
+          <div class="controls primary-controls" aria-label="计时控制">
+            <button class="primary-button" id="startButton" type="button">开始本局</button>
+            <button class="secondary-button" id="pauseButton" type="button" disabled>暂停</button>
+            <button class="secondary-button" id="resetButton" type="button">重置</button>
+            <label class="switch">
+              <input id="enabledSwitch" type="checkbox" checked />
+              <span>提醒开启</span>
+            </label>
+            <button class="icon-button" id="soundButton" type="button" title="浏览器通知">
+              <svg aria-hidden="true" viewBox="0 0 24 24" class="button-icon">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+              <span class="sr-only">浏览器通知</span>
+            </button>
+          </div>
+
+          <div class="sync-panel primary-sync" aria-label="时间同步">
+            <div class="sync-head">
+              <span>同步本局时间</span>
+            </div>
+            <div class="sync-pick-row">
+              <div class="time-picker">
+                <div class="phase-toggle" aria-label="同步时间阶段">
+                  <button class="phase-button is-active" id="syncBeforeButton" type="button">赛前</button>
+                  <button class="phase-button" id="syncAfterButton" type="button">赛后</button>
+                </div>
+                <label>
+                  <span>分钟</span>
+                  <input id="syncMinuteInput" type="number" inputmode="numeric" min="0" max="180" step="1" value="1" />
+                </label>
+                <label>
+                  <span>秒</span>
+                  <input id="syncSecondInput" type="number" inputmode="numeric" min="0" max="59" step="1" value="30" />
+                </label>
+              </div>
+              <button class="primary-button sync-action" id="syncTimeButton" type="button">立即同步</button>
+            </div>
+            <div class="quick-time-grid" aria-label="常用同步时间">
+              <button class="chip-button" type="button" data-sync-time="-60">-01:00</button>
+              <button class="chip-button" type="button" data-sync-time="-30">-00:30</button>
+              <button class="chip-button" type="button" data-sync-time="-15">-00:15</button>
+            </div>
+            <div class="time-stepper sync-stepper" aria-label="微调同步时间">
+              <button class="chip-button" type="button" data-sync-step="30">+30秒</button>
+              <button class="chip-button" type="button" data-sync-step="10">+10秒</button>
+              <button class="chip-button" type="button" data-sync-step="5">+5秒</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="secondary-status">
           <div class="next-block">
             <span class="clock-label">下一提醒</span>
             <strong id="nextTime">00:05</strong>
             <p id="nextMessage">按 Ctrl + F1 编队</p>
           </div>
-        </div>
 
-        <div class="progress-wrap" aria-hidden="true">
-          <div class="progress-track">
-            <div class="progress-fill" id="progressFill"></div>
-          </div>
-          <div class="progress-markers" id="progressMarkers"></div>
-        </div>
-
-        <div class="controls" aria-label="计时控制">
-          <button class="primary-button" id="startButton" type="button">开始本局</button>
-          <button class="secondary-button" id="pauseButton" type="button" disabled>暂停</button>
-          <button class="secondary-button" id="resetButton" type="button">重置</button>
-          <label class="switch">
-            <input id="enabledSwitch" type="checkbox" checked />
-            <span>提醒开启</span>
-          </label>
-        </div>
-
-        <div class="sync-panel" aria-label="时间同步">
-          <div class="sync-head">
-            <span>同步本局时间</span>
-            <button class="secondary-button" id="syncTimeButton" type="button">按选择同步</button>
-          </div>
-          <div class="time-picker">
-            <div class="phase-toggle" aria-label="同步时间阶段">
-              <button class="phase-button is-active" id="syncBeforeButton" type="button">赛前</button>
-              <button class="phase-button" id="syncAfterButton" type="button">赛后</button>
+          <div class="progress-wrap" aria-hidden="true">
+            <div class="progress-track">
+              <div class="progress-fill" id="progressFill"></div>
             </div>
-            <label>
-              <span>分钟</span>
-              <input id="syncMinuteInput" type="number" inputmode="numeric" min="0" max="180" step="1" value="1" />
-            </label>
-            <label>
-              <span>秒</span>
-              <input id="syncSecondInput" type="number" inputmode="numeric" min="0" max="59" step="1" value="30" />
-            </label>
-          </div>
-          <div class="quick-time-grid" aria-label="常用同步时间">
-            <button class="chip-button" type="button" data-sync-time="-90">-01:30</button>
-            <button class="chip-button" type="button" data-sync-time="-60">-01:00</button>
-            <button class="chip-button" type="button" data-sync-time="-30">-00:30</button>
-            <button class="chip-button" type="button" data-sync-time="0">00:00</button>
-            <button class="chip-button" type="button" data-sync-time="35">00:35</button>
-            <button class="chip-button" type="button" data-sync-time="95">01:35</button>
-            <button class="chip-button" type="button" data-sync-time="170">02:50</button>
-            <button class="chip-button" type="button" data-sync-time="410">06:50</button>
-            <button class="chip-button" type="button" data-sync-time="420">07:00</button>
+            <div class="progress-markers" id="progressMarkers"></div>
           </div>
         </div>
 
@@ -103,20 +110,9 @@
           <button class="ghost-button" id="resetDefaultsButton" type="button">恢复默认</button>
         </div>
 
-        <section class="preset-panel" aria-label="路线预设">
-          <div>
-            <span class="section-label">路线预设</span>
-            <p>一键换成中路或边路提醒表。</p>
-          </div>
-          <div class="preset-actions">
-            <button class="secondary-button" id="midPresetButton" type="button">中路</button>
-            <button class="secondary-button" id="sidePresetButton" type="button">边路</button>
-          </div>
-        </section>
-
         <form class="editor" id="reminderForm">
           <div class="time-editor">
-            <span class="field-label">时间</span>
+            <span class="field-label">提醒时间</span>
             <input id="timeInput" name="time" type="hidden" value="00:05" />
             <div class="time-picker compact">
               <div class="phase-toggle" aria-label="提醒时间阶段">

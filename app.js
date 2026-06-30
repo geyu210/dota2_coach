@@ -161,6 +161,7 @@ const state = {
   activeAudio: null,
   syncTimeSign: -1,
   reminderTimeSign: 1,
+  activePreset: "",
   reminderRenderKey: "",
   voiceRenderKey: "",
 };
@@ -179,6 +180,7 @@ const elements = {
   syncSecondInput: document.querySelector("#syncSecondInput"),
   syncTimeButton: document.querySelector("#syncTimeButton"),
   syncQuickButtons: document.querySelectorAll("[data-sync-time]"),
+  syncStepButtons: document.querySelectorAll("[data-sync-step]"),
   reminderList: document.querySelector("#reminderList"),
   reminderForm: document.querySelector("#reminderForm"),
   timeInput: document.querySelector("#timeInput"),
@@ -309,6 +311,12 @@ function hasSameReminderSchedule(reminders, expectedReminders) {
 
 function reminderSignature(reminder) {
   return `${reminder.seconds}|${reminder.message}`;
+}
+
+function detectPresetName(reminders) {
+  return Object.keys(REMINDER_PRESETS).find((presetName) =>
+    hasSameReminderSchedule(reminders, REMINDER_PRESETS[presetName].reminders),
+  ) || "";
 }
 
 function loadState() {
@@ -538,6 +546,10 @@ function setPickerSeconds(kind, totalSeconds) {
 
 function adjustReminderTime(deltaSeconds) {
   setPickerSeconds("reminder", pickerSeconds("reminder") + deltaSeconds);
+}
+
+function adjustSyncTime(deltaSeconds) {
+  syncToSeconds(pickerSeconds("sync") + deltaSeconds);
 }
 
 function updateReminderTimeInput() {
@@ -856,6 +868,7 @@ function upsertReminder(event) {
   } else {
     state.reminders = [...state.reminders, payload];
   }
+  state.activePreset = detectPresetName(state.reminders);
 
   state.editingId = null;
   if (state.running && payload.seconds <= elapsedSeconds()) {
@@ -889,6 +902,7 @@ function editReminder(id) {
 
 function removeReminder(id) {
   state.reminders = state.reminders.filter((reminder) => reminder.id !== id);
+  state.activePreset = detectPresetName(state.reminders);
   state.firedIds.delete(id);
   if (state.editingId === id) {
     state.editingId = null;
@@ -904,6 +918,7 @@ function toggleReminder(id) {
   state.reminders = state.reminders.map((reminder) =>
     reminder.id === id ? { ...reminder, enabled: !reminder.enabled } : reminder,
   );
+  state.activePreset = detectPresetName(state.reminders);
   state.firedIds.delete(id);
   saveState();
   render(true);
@@ -911,6 +926,7 @@ function toggleReminder(id) {
 
 function resetDefaults() {
   state.reminders = cloneDefaultReminders();
+  state.activePreset = "mid";
   state.firedIds.clear();
   state.editingId = null;
   elements.reminderForm.reset();
@@ -926,6 +942,7 @@ function resetDefaults() {
 function applyPreset(presetName) {
   const elapsed = elapsedSeconds();
   state.reminders = clonePresetReminders(presetName);
+  state.activePreset = presetName;
   state.firedIds.clear();
   if (state.running) {
     markPastRemindersFired(elapsed);
@@ -1059,6 +1076,7 @@ async function importConfigFile(file) {
       ...reminder,
       voiceId: voiceIds.has(reminder.voiceId) ? reminder.voiceId : "",
     }));
+    state.activePreset = detectPresetName(state.reminders);
     state.alertsEnabled = payload.alertsEnabled !== false;
     state.firedIds.clear();
     state.editingId = null;
@@ -1237,6 +1255,11 @@ function renderProgress() {
   );
 }
 
+function renderPresetButtons() {
+  elements.midPresetButton.classList.toggle("is-active", state.activePreset === "mid");
+  elements.sidePresetButton.classList.toggle("is-active", state.activePreset === "side");
+}
+
 function render(forceList = false) {
   const elapsed = elapsedSeconds();
   const next = nextReminder();
@@ -1253,6 +1276,7 @@ function render(forceList = false) {
   }
 
   renderVoiceSelect();
+  renderPresetButtons();
   renderProgress();
   renderReminderList(forceList);
   renderVoiceList(forceList);
@@ -1282,6 +1306,9 @@ function bindEvents() {
   });
   elements.syncQuickButtons.forEach((button) => {
     button.addEventListener("click", () => syncToSeconds(Number(button.dataset.syncTime)));
+  });
+  elements.syncStepButtons.forEach((button) => {
+    button.addEventListener("click", () => adjustSyncTime(Number(button.dataset.syncStep)));
   });
   elements.reminderBeforeButton.addEventListener("click", () => setPickerSign("reminder", -1));
   elements.reminderAfterButton.addEventListener("click", () => setPickerSign("reminder", 1));
@@ -1321,6 +1348,7 @@ function bindEvents() {
 async function init() {
   const saved = loadState();
   state.reminders = saved.reminders;
+  state.activePreset = detectPresetName(state.reminders);
   state.alertsEnabled = saved.alertsEnabled;
   saveState();
 
