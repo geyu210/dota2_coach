@@ -257,6 +257,19 @@ h3 {
   min-width: 0;
 }
 
+.primary-controls .alert-switch {
+  border-color: rgba(97, 211, 148, 0.7);
+  background: rgba(97, 211, 148, 0.14);
+  color: var(--green);
+  font-weight: 800;
+}
+
+.primary-controls .alert-switch.is-off {
+  border-color: rgba(234, 111, 99, 0.75);
+  background: rgba(234, 111, 99, 0.14);
+  color: var(--red);
+}
+
 .sync-panel {
   display: grid;
   gap: 10px;

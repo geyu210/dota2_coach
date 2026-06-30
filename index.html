@@ -34,9 +34,9 @@
             <button class="primary-button" id="startButton" type="button">开始本局</button>
             <button class="secondary-button" id="pauseButton" type="button" disabled>暂停</button>
             <button class="secondary-button" id="resetButton" type="button">重置</button>
-            <label class="switch">
+            <label class="switch alert-switch" id="enabledSwitchLabel">
               <input id="enabledSwitch" type="checkbox" checked />
-              <span>提醒开启</span>
+              <span id="enabledSwitchText">声音提醒已开</span>
             </label>
             <button class="icon-button" id="soundButton" type="button" title="浏览器通知">
               <svg aria-hidden="true" viewBox="0 0 24 24" class="button-icon">
@@ -69,9 +69,9 @@
               <button class="primary-button sync-action" id="syncTimeButton" type="button">立即同步</button>
             </div>
             <div class="quick-time-grid" aria-label="减少同步时间">
-              <button class="chip-button" type="button" data-sync-step="-60">-01:00</button>
-              <button class="chip-button" type="button" data-sync-step="-30">-00:30</button>
-              <button class="chip-button" type="button" data-sync-step="-15">-00:15</button>
+              <button class="chip-button" type="button" data-sync-step="-30">-30秒</button>
+              <button class="chip-button" type="button" data-sync-step="-10">-10秒</button>
+              <button class="chip-button" type="button" data-sync-step="-5">-5秒</button>
             </div>
             <div class="time-stepper sync-stepper" aria-label="微调同步时间">
               <button class="chip-button" type="button" data-sync-step="30">+30秒</button>
@@ -208,6 +208,6 @@
       </button>
     </div>
 
-    <script src="app.js?v=11" defer></script>
+    <script src="app.js?v=12" defer></script>
   </body>
 </html>

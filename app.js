@@ -1,8 +1,9 @@
-const CONFIG_VERSION = 9;
+const CONFIG_VERSION = 10;
 const MATCH_START_SECONDS = -90;
 const INITIAL_REMINDER_SECONDS = 5;
-const STORAGE_KEY = "dota2-coach-state-v9";
+const STORAGE_KEY = "dota2-coach-state-v10";
 const LEGACY_STORAGE_KEYS = [
+  "dota2-coach-state-v9",
   "dota2-coach-state-v8",
   "dota2-coach-state-v7",
   "dota2-coach-state-v6",
@@ -170,6 +171,8 @@ const state = {
   editingId: null,
   audioContext: null,
   activeAudio: null,
+  wakeLock: null,
+  wakeLockWanted: false,
   syncTimeSign: -1,
   reminderTimeSign: 1,
   activePreset: "",
@@ -207,6 +210,8 @@ const elements = {
   resetDefaultsButton: document.querySelector("#resetDefaultsButton"),
   midPresetButton: document.querySelector("#midPresetButton"),
   sidePresetButton: document.querySelector("#sidePresetButton"),
+  enabledSwitchLabel: document.querySelector("#enabledSwitchLabel"),
+  enabledSwitchText: document.querySelector("#enabledSwitchText"),
   toast: document.querySelector("#toast"),
   toastMessage: document.querySelector("#toastMessage"),
   dismissToastButton: document.querySelector("#dismissToastButton"),
@@ -355,7 +360,7 @@ function loadState() {
 
     return {
       reminders: reminders.length ? reminders : fallback.reminders,
-      alertsEnabled: saved.alertsEnabled !== false,
+      alertsEnabled: shouldAutoAssignVoices ? true : saved.alertsEnabled !== false,
     };
   } catch {
     return fallback;
@@ -441,7 +446,7 @@ function elapsedSeconds() {
     return Math.floor(state.elapsedBeforeRun);
   }
 
-  return Math.floor(state.elapsedBeforeRun + (performance.now() - state.startedAt) / 1000);
+  return Math.floor(state.elapsedBeforeRun + (Date.now() - state.startedAt) / 1000);
 }
 
 function formatTime(totalSeconds) {
@@ -570,10 +575,11 @@ function syncToSeconds(seconds) {
   state.running = true;
   state.paused = false;
   state.elapsedBeforeRun = Math.trunc(seconds);
-  state.startedAt = performance.now();
+  state.startedAt = Date.now();
   markPastRemindersFired(state.elapsedBeforeRun);
   hideToast();
   setPickerSeconds("sync", state.elapsedBeforeRun);
+  requestScreenWakeLock();
   render(true);
 }
 
@@ -672,8 +678,9 @@ function startMatch() {
   state.running = true;
   state.paused = false;
   state.elapsedBeforeRun = MATCH_START_SECONDS;
-  state.startedAt = performance.now();
+  state.startedAt = Date.now();
   state.firedIds.clear();
+  requestScreenWakeLock();
   render(true);
 }
 
@@ -696,10 +703,12 @@ function togglePause() {
 
   if (state.paused) {
     state.paused = false;
-    state.startedAt = performance.now();
+    state.startedAt = Date.now();
+    requestScreenWakeLock();
   } else {
     state.elapsedBeforeRun = elapsedSeconds();
     state.paused = true;
+    releaseScreenWakeLock();
   }
 
   render();
@@ -711,8 +720,45 @@ function resetMatch() {
   state.elapsedBeforeRun = MATCH_START_SECONDS;
   state.startedAt = 0;
   state.firedIds.clear();
+  releaseScreenWakeLock();
   hideToast();
   render(true);
+}
+
+async function requestScreenWakeLock() {
+  state.wakeLockWanted = true;
+  if (!("wakeLock" in navigator) || state.wakeLock || document.visibilityState !== "visible") {
+    return;
+  }
+
+  try {
+    state.wakeLock = await navigator.wakeLock.request("screen");
+    state.wakeLock.addEventListener("release", () => {
+      state.wakeLock = null;
+    });
+  } catch {
+    state.wakeLock = null;
+  }
+}
+
+function releaseScreenWakeLock() {
+  state.wakeLockWanted = false;
+  if (!state.wakeLock) {
+    return;
+  }
+
+  state.wakeLock.release().catch(() => {});
+  state.wakeLock = null;
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    if (state.running && !state.paused && state.wakeLockWanted) {
+      requestScreenWakeLock();
+    }
+    updateDueReminders();
+    render(true);
+  }
 }
 
 function updateDueReminders() {
@@ -1281,6 +1327,8 @@ function render(forceList = false) {
   elements.pauseButton.textContent = state.paused ? "继续" : "暂停";
   elements.pauseButton.disabled = !state.running;
   elements.enabledSwitch.checked = state.alertsEnabled;
+  elements.enabledSwitchText.textContent = state.alertsEnabled ? "声音提醒已开" : "声音提醒已关";
+  elements.enabledSwitchLabel.classList.toggle("is-off", !state.alertsEnabled);
   if (!isEditingSyncTime()) {
     setPickerSeconds("sync", elapsed);
   }
@@ -1350,6 +1398,7 @@ function bindEvents() {
       importConfigFile(file);
     }
   });
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 }
 
 async function init() {
