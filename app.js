@@ -1,8 +1,9 @@
-const CONFIG_VERSION = 8;
+const CONFIG_VERSION = 9;
 const MATCH_START_SECONDS = -90;
 const INITIAL_REMINDER_SECONDS = 5;
-const STORAGE_KEY = "dota2-coach-state-v8";
+const STORAGE_KEY = "dota2-coach-state-v9";
 const LEGACY_STORAGE_KEYS = [
+  "dota2-coach-state-v8",
   "dota2-coach-state-v7",
   "dota2-coach-state-v6",
   "dota2-coach-state-v5",
@@ -169,11 +170,8 @@ const state = {
   editingId: null,
   audioContext: null,
   activeAudio: null,
-  activeBufferSource: null,
-  audioPrimed: false,
   audioPrepared: false,
   voicePreloadPromise: null,
-  voiceBuffers: new Map(),
   voicePreloadElements: new Map(),
   syncTimeSign: -1,
   reminderTimeSign: 1,
@@ -215,6 +213,7 @@ const elements = {
   toast: document.querySelector("#toast"),
   toastMessage: document.querySelector("#toastMessage"),
   dismissToastButton: document.querySelector("#dismissToastButton"),
+  audioPlayer: document.querySelector("#audioPlayer"),
   soundButton: document.querySelector("#soundButton"),
   progressFill: document.querySelector("#progressFill"),
   progressMarkers: document.querySelector("#progressMarkers"),
@@ -794,29 +793,73 @@ function voiceSource(voice) {
   return voice?.dataUrl || voice?.url || "";
 }
 
-function playReminderAudio(voiceId) {
+function playReminderAudio(voiceId, options = {}) {
   const voice = findVoice(voiceId);
   if (!voice) {
     playTone();
     return;
   }
 
-  if (playBufferedVoice(voice.id)) {
+  playVoice(voice, options);
+}
+
+function playVoice(voice, options = {}) {
+  const source = voiceSource(voice);
+  if (!source) {
+    playTone();
     return;
   }
 
+  const audio = getVoiceAudioElement(voice);
   try {
-    if (state.activeAudio) {
+    if (state.activeAudio && state.activeAudio !== audio) {
       state.activeAudio.pause();
-      state.activeAudio.currentTime = 0;
     }
 
-    const audio = new Audio(voiceSource(voice));
-    audio.preload = "auto";
+    audio.muted = false;
+    audio.volume = 1;
+    audio.pause();
+    resetAudioPosition(audio);
     state.activeAudio = audio;
-    audio.play().catch(() => playTone());
+
+    const playPromise = audio.play();
+    if (playPromise?.catch) {
+      playPromise.catch(() => {
+        if (options.feedback) {
+          showInlineMessage("浏览器拦截了声音，请再点一次试听或开始本局");
+        }
+        playTone();
+      });
+    }
   } catch {
+    if (options.feedback) {
+      showInlineMessage("语音播放失败，请检查手机是否静音");
+    }
     playTone();
+  }
+}
+
+function getVoiceAudioElement(voice) {
+  const source = voiceSource(voice);
+  if (state.voicePreloadElements.has(voice.id)) {
+    return state.voicePreloadElements.get(voice.id);
+  }
+
+  const audio = voice.id === "builtin-control-group" && elements.audioPlayer
+    ? elements.audioPlayer
+    : new Audio();
+  audio.preload = "auto";
+  audio.setAttribute("playsinline", "");
+  audio.src = source;
+  state.voicePreloadElements.set(voice.id, audio);
+  return audio;
+}
+
+function resetAudioPosition(audio) {
+  try {
+    audio.currentTime = 0;
+  } catch {
+    // Some browsers only allow seeking after metadata has loaded.
   }
 }
 
@@ -841,68 +884,6 @@ async function resumeAudioContext() {
   }
 
   return context;
-}
-
-function primeAudioOutput(context) {
-  if (!context || state.audioPrimed) {
-    return;
-  }
-
-  try {
-    const source = context.createBufferSource();
-    const gain = context.createGain();
-    source.buffer = context.createBuffer(1, 1, 22050);
-    gain.gain.value = 0;
-    source.connect(gain);
-    gain.connect(context.destination);
-    source.start(0);
-    source.stop(context.currentTime + 0.01);
-    state.audioPrimed = true;
-  } catch {
-    // Some browsers only allow priming after the audio context has resumed.
-  }
-}
-
-function playBufferedVoice(voiceId) {
-  const buffer = state.voiceBuffers.get(voiceId);
-  const context = getAudioContext();
-  if (!buffer || !context) {
-    return false;
-  }
-
-  try {
-    if (context.state === "suspended") {
-      context.resume().catch(() => {});
-    }
-
-    if (state.activeBufferSource) {
-      try {
-        state.activeBufferSource.stop();
-        state.activeBufferSource.disconnect();
-      } catch {
-        // A source can already be stopped by the time the next reminder fires.
-      }
-    }
-
-    if (state.activeAudio) {
-      state.activeAudio.pause();
-      state.activeAudio.currentTime = 0;
-    }
-
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    source.start();
-    state.activeBufferSource = source;
-    source.onended = () => {
-      if (state.activeBufferSource === source) {
-        state.activeBufferSource = null;
-      }
-    };
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function playTone() {
@@ -938,16 +919,12 @@ function playTone() {
 function prepareAudio(options = {}) {
   const { announce = false, priorityVoiceId = "" } = options;
   state.audioPrepared = true;
-  const context = getAudioContext();
-  primeAudioOutput(context);
-  resumeAudioContext()
-    .then((resumedContext) => primeAudioOutput(resumedContext))
-    .catch(() => {});
+  resumeAudioContext().catch(() => {});
 
-  if (priorityVoiceId && !state.voiceBuffers.has(priorityVoiceId)) {
+  if (priorityVoiceId) {
     const priorityVoice = findVoice(priorityVoiceId);
     if (priorityVoice) {
-      preloadVoice(priorityVoice).catch(() => {});
+      preloadVoice(priorityVoice, { unlock: true }).catch(() => {});
     }
   }
 
@@ -977,81 +954,63 @@ async function preloadVoices(priorityVoiceId = "") {
     return 0;
   }
 
-  const results = await Promise.allSettled(voices.map((voice) => preloadVoice(voice)));
+  const results = await Promise.allSettled(voices.map((voice) => preloadVoice(voice, { unlock: true })));
   return results.filter((result) => result.status === "fulfilled" && result.value).length;
 }
 
-async function preloadVoice(voice) {
-  if (state.voiceBuffers.has(voice.id)) {
-    return true;
-  }
-
-  const source = voiceSource(voice);
-  if (!source) {
-    return false;
-  }
-
-  if (!window.fetch) {
-    return preloadVoiceElement(voice);
-  }
-
-  try {
-    const response = await fetch(source, { cache: voice.url ? "force-cache" : "default" });
-    if (!response.ok) {
-      throw new Error(`Cannot load voice: ${voice.name}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const context = await resumeAudioContext();
-    if (!context) {
-      return false;
-    }
-
-    const buffer = await decodeAudioBuffer(context, arrayBuffer);
-    state.voiceBuffers.set(voice.id, buffer);
-    return true;
-  } catch {
-    return preloadVoiceElement(voice);
-  }
+async function preloadVoice(voice, options = {}) {
+  return preloadVoiceElement(voice, options);
 }
 
-function decodeAudioBuffer(context, arrayBuffer) {
-  return new Promise((resolve, reject) => {
-    const copy = arrayBuffer.slice(0);
-    const result = context.decodeAudioData(copy, resolve, reject);
-    if (result?.then) {
-      result.then(resolve, reject);
-    }
-  });
-}
-
-function preloadVoiceElement(voice) {
-  if (state.voicePreloadElements.has(voice.id)) {
-    return true;
-  }
-
+function preloadVoiceElement(voice, options = {}) {
   const source = voiceSource(voice);
   if (!source) {
-    return false;
+    return Promise.resolve(false);
+  }
+
+  const audio = getVoiceAudioElement(voice);
+  if (options.unlock && audio.dataset.unlocked === "true") {
+    return Promise.resolve(true);
   }
 
   return new Promise((resolve) => {
-    const audio = new Audio(source);
-    audio.preload = "auto";
-    state.voicePreloadElements.set(voice.id, audio);
-
     const finish = () => resolve(true);
     audio.addEventListener("canplaythrough", finish, { once: true });
     audio.addEventListener("loadeddata", finish, { once: true });
     audio.addEventListener("error", () => resolve(false), { once: true });
     audio.load();
+    if (options.unlock) {
+      unlockVoiceAudio(audio).then(resolve);
+    }
     window.setTimeout(finish, 2500);
   });
 }
 
+async function unlockVoiceAudio(audio) {
+  try {
+    audio.muted = true;
+    const playPromise = audio.play();
+    if (playPromise?.then) {
+      await playPromise;
+    }
+    audio.pause();
+    resetAudioPosition(audio);
+    audio.muted = false;
+    audio.dataset.unlocked = "true";
+    return true;
+  } catch {
+    audio.muted = false;
+    return false;
+  }
+}
+
 function resetVoicePreload() {
   state.voicePreloadPromise = null;
-  state.voiceBuffers.clear();
+  state.voicePreloadElements.forEach((audio) => {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+  });
   state.voicePreloadElements.clear();
   if (state.audioPrepared) {
     prepareAudio();
@@ -1081,19 +1040,33 @@ async function enableBrowserNotifications() {
   showInlineMessage(permission === "granted" ? "浏览器通知已开启" : "浏览器通知未开启");
 }
 
-function registerServiceWorker() {
+function cleanupServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") {
     return;
   }
 
-  const register = () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+  const cleanup = () => {
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      registration?.unregister();
+    }).catch(() => {});
+
+    if ("caches" in window) {
+      caches.keys()
+        .then((keys) =>
+          Promise.all(
+            keys
+              .filter((key) => key.startsWith("dota2-coach-"))
+              .map((key) => caches.delete(key)),
+          ),
+        )
+        .catch(() => {});
+    }
   };
 
   if (document.readyState === "complete") {
-    register();
+    cleanup();
   } else {
-    window.addEventListener("load", register, { once: true });
+    window.addEventListener("load", cleanup, { once: true });
   }
 }
 
@@ -1469,7 +1442,7 @@ function renderVoiceList(force = false) {
       playButton.type = "button";
       playButton.className = "ghost-button";
       playButton.textContent = "试听";
-      playButton.addEventListener("click", () => playReminderAudio(voice.id));
+      playButton.addEventListener("click", () => playReminderAudio(voice.id, { feedback: true }));
 
       actions.append(playButton);
 
@@ -1553,8 +1526,6 @@ function tick() {
 }
 
 function bindEvents() {
-  document.addEventListener("pointerdown", () => prepareAudio(), { once: true, passive: true });
-  document.addEventListener("keydown", () => prepareAudio(), { once: true });
   elements.startButton.addEventListener("click", startMatch);
   elements.pauseButton.addEventListener("click", togglePause);
   elements.resetButton.addEventListener("click", resetMatch);
@@ -1628,7 +1599,7 @@ async function init() {
 
   bindEvents();
   render(true);
-  registerServiceWorker();
+  cleanupServiceWorker();
   window.setInterval(tick, 250);
 }
 
