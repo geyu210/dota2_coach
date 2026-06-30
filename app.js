@@ -170,9 +170,6 @@ const state = {
   editingId: null,
   audioContext: null,
   activeAudio: null,
-  audioPrepared: false,
-  voicePreloadPromise: null,
-  voicePreloadElements: new Map(),
   syncTimeSign: -1,
   reminderTimeSign: 1,
   activePreset: "",
@@ -213,7 +210,6 @@ const elements = {
   toast: document.querySelector("#toast"),
   toastMessage: document.querySelector("#toastMessage"),
   dismissToastButton: document.querySelector("#dismissToastButton"),
-  audioPlayer: document.querySelector("#audioPlayer"),
   soundButton: document.querySelector("#soundButton"),
   progressFill: document.querySelector("#progressFill"),
   progressMarkers: document.querySelector("#progressMarkers"),
@@ -571,7 +567,6 @@ function updateReminderTimeInput() {
 }
 
 function syncToSeconds(seconds) {
-  prepareAudio();
   state.running = true;
   state.paused = false;
   state.elapsedBeforeRun = Math.trunc(seconds);
@@ -579,7 +574,6 @@ function syncToSeconds(seconds) {
   markPastRemindersFired(state.elapsedBeforeRun);
   hideToast();
   setPickerSeconds("sync", state.elapsedBeforeRun);
-  prepareUpcomingAudio();
   render(true);
 }
 
@@ -675,25 +669,16 @@ async function replaceVoiceLibrary(voices) {
 }
 
 function startMatch() {
-  prepareAudio();
   state.running = true;
   state.paused = false;
   state.elapsedBeforeRun = MATCH_START_SECONDS;
   state.startedAt = performance.now();
   state.firedIds.clear();
-  prepareUpcomingAudio();
   render(true);
 }
 
 function syncMatchTime() {
   syncToSeconds(pickerSeconds("sync"));
-}
-
-function prepareUpcomingAudio() {
-  const next = nextReminder();
-  if (next?.voiceId) {
-    prepareAudio({ priorityVoiceId: next.voiceId });
-  }
 }
 
 function markPastRemindersFired(seconds) {
@@ -789,114 +774,36 @@ function findVoice(voiceId) {
   return state.voices.find((voice) => voice.id === voiceId) || null;
 }
 
-function voiceSource(voice) {
-  return voice?.dataUrl || voice?.url || "";
-}
-
-function playReminderAudio(voiceId, options = {}) {
+function playReminderAudio(voiceId) {
   const voice = findVoice(voiceId);
   if (!voice) {
     playTone();
     return;
   }
 
-  playVoice(voice, options);
-}
-
-function playVoice(voice, options = {}) {
-  const source = voiceSource(voice);
-  if (!source) {
-    playTone();
-    return;
-  }
-
-  const audio = getVoiceAudioElement(voice);
   try {
-    if (state.activeAudio && state.activeAudio !== audio) {
+    if (state.activeAudio) {
       state.activeAudio.pause();
+      state.activeAudio.currentTime = 0;
     }
 
-    audio.muted = false;
-    audio.volume = 1;
-    audio.pause();
-    resetAudioPosition(audio);
+    const audio = new Audio(voice.dataUrl || voice.url);
     state.activeAudio = audio;
-
-    const playPromise = audio.play();
-    if (playPromise?.catch) {
-      playPromise.catch(() => {
-        if (options.feedback) {
-          showInlineMessage("浏览器拦截了声音，请再点一次试听或开始本局");
-        }
-        playTone();
-      });
-    }
+    audio.play().catch(() => playTone());
   } catch {
-    if (options.feedback) {
-      showInlineMessage("语音播放失败，请检查手机是否静音");
-    }
     playTone();
   }
-}
-
-function getVoiceAudioElement(voice) {
-  const source = voiceSource(voice);
-  if (state.voicePreloadElements.has(voice.id)) {
-    return state.voicePreloadElements.get(voice.id);
-  }
-
-  const audio = voice.id === "builtin-control-group" && elements.audioPlayer
-    ? elements.audioPlayer
-    : new Audio();
-  audio.preload = "auto";
-  audio.setAttribute("playsinline", "");
-  audio.src = source;
-  state.voicePreloadElements.set(voice.id, audio);
-  return audio;
-}
-
-function resetAudioPosition(audio) {
-  try {
-    audio.currentTime = 0;
-  } catch {
-    // Some browsers only allow seeking after metadata has loaded.
-  }
-}
-
-function getAudioContext() {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) {
-    return null;
-  }
-
-  state.audioContext ||= new AudioContext();
-  return state.audioContext;
-}
-
-async function resumeAudioContext() {
-  const context = getAudioContext();
-  if (!context) {
-    return null;
-  }
-
-  if (context.state === "suspended") {
-    await context.resume();
-  }
-
-  return context;
 }
 
 function playTone() {
   try {
-    const context = getAudioContext();
-    if (!context) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) {
       return;
     }
 
-    if (context.state === "suspended") {
-      context.resume().catch(() => {});
-    }
-
+    state.audioContext ||= new AudioContext();
+    const context = state.audioContext;
     const oscillator = context.createOscillator();
     const gain = context.createGain();
 
@@ -916,109 +823,7 @@ function playTone() {
   }
 }
 
-function prepareAudio(options = {}) {
-  const { announce = false, priorityVoiceId = "" } = options;
-  state.audioPrepared = true;
-  resumeAudioContext().catch(() => {});
-
-  if (priorityVoiceId) {
-    const priorityVoice = findVoice(priorityVoiceId);
-    if (priorityVoice) {
-      preloadVoice(priorityVoice, { unlock: true }).catch(() => {});
-    }
-  }
-
-  if (!state.voicePreloadPromise) {
-    state.voicePreloadPromise = preloadVoices(priorityVoiceId);
-  }
-
-  if (announce) {
-    showInlineMessage("正在准备语音");
-    state.voicePreloadPromise
-      .then((count) => {
-        showInlineMessage(count ? `语音已准备 ${count} 段` : "当前没有可准备的语音");
-      })
-      .catch(() => {
-        showInlineMessage("语音准备失败，将使用默认提示音");
-      });
-  }
-
-  return state.voicePreloadPromise;
-}
-
-async function preloadVoices(priorityVoiceId = "") {
-  const voices = sortedVoices()
-    .filter((voice) => voiceSource(voice))
-    .sort((a, b) => Number(b.id === priorityVoiceId) - Number(a.id === priorityVoiceId));
-  if (!voices.length) {
-    return 0;
-  }
-
-  const results = await Promise.allSettled(voices.map((voice) => preloadVoice(voice, { unlock: true })));
-  return results.filter((result) => result.status === "fulfilled" && result.value).length;
-}
-
-async function preloadVoice(voice, options = {}) {
-  return preloadVoiceElement(voice, options);
-}
-
-function preloadVoiceElement(voice, options = {}) {
-  const source = voiceSource(voice);
-  if (!source) {
-    return Promise.resolve(false);
-  }
-
-  const audio = getVoiceAudioElement(voice);
-  if (options.unlock && audio.dataset.unlocked === "true") {
-    return Promise.resolve(true);
-  }
-
-  return new Promise((resolve) => {
-    const finish = () => resolve(true);
-    audio.addEventListener("canplaythrough", finish, { once: true });
-    audio.addEventListener("loadeddata", finish, { once: true });
-    audio.addEventListener("error", () => resolve(false), { once: true });
-    audio.load();
-    if (options.unlock) {
-      unlockVoiceAudio(audio).then(resolve);
-    }
-    window.setTimeout(finish, 2500);
-  });
-}
-
-async function unlockVoiceAudio(audio) {
-  try {
-    audio.muted = true;
-    const playPromise = audio.play();
-    if (playPromise?.then) {
-      await playPromise;
-    }
-    audio.pause();
-    resetAudioPosition(audio);
-    audio.muted = false;
-    audio.dataset.unlocked = "true";
-    return true;
-  } catch {
-    audio.muted = false;
-    return false;
-  }
-}
-
-function resetVoicePreload() {
-  state.voicePreloadPromise = null;
-  state.voicePreloadElements.forEach((audio) => {
-    audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
-  });
-  state.voicePreloadElements.clear();
-  if (state.audioPrepared) {
-    prepareAudio();
-  }
-}
-
 async function enableBrowserNotifications() {
-  prepareAudio({ announce: true });
   playTone();
 
   if (!("Notification" in window)) {
@@ -1038,36 +843,6 @@ async function enableBrowserNotifications() {
 
   const permission = await Notification.requestPermission();
   showInlineMessage(permission === "granted" ? "浏览器通知已开启" : "浏览器通知未开启");
-}
-
-function cleanupServiceWorker() {
-  if (!("serviceWorker" in navigator) || location.protocol === "file:") {
-    return;
-  }
-
-  const cleanup = () => {
-    navigator.serviceWorker.getRegistration().then((registration) => {
-      registration?.unregister();
-    }).catch(() => {});
-
-    if ("caches" in window) {
-      caches.keys()
-        .then((keys) =>
-          Promise.all(
-            keys
-              .filter((key) => key.startsWith("dota2-coach-"))
-              .map((key) => caches.delete(key)),
-          ),
-        )
-        .catch(() => {});
-    }
-  };
-
-  if (document.readyState === "complete") {
-    cleanup();
-  } else {
-    window.addEventListener("load", cleanup, { once: true });
-  }
 }
 
 function showInlineMessage(message) {
@@ -1216,7 +991,6 @@ async function importVoiceFiles(files) {
     }
 
     state.voices = sortedVoicesByName([...state.voices, ...voices]);
-    resetVoicePreload();
     showInlineMessage(`已导入 ${voices.length} 段语音`);
     render(true);
   } catch (error) {
@@ -1255,7 +1029,6 @@ async function deleteVoice(id) {
   try {
     await deleteVoiceRecord(id);
     state.voices = state.voices.filter((voice) => voice.id !== id);
-    resetVoicePreload();
     state.reminders = state.reminders.map((reminder) =>
       reminder.voiceId === id ? { ...reminder, voiceId: "" } : reminder,
     );
@@ -1308,7 +1081,6 @@ async function importConfigFile(file) {
 
     const customVoices = voices.filter((voice) => voice.dataUrl);
     state.voices = sortedVoicesByName([...BUNDLED_VOICES, ...customVoices]);
-    resetVoicePreload();
     const voiceIds = new Set(state.voices.map((voice) => voice.id));
     state.reminders = reminders.map((reminder) => ({
       ...reminder,
@@ -1442,7 +1214,7 @@ function renderVoiceList(force = false) {
       playButton.type = "button";
       playButton.className = "ghost-button";
       playButton.textContent = "试听";
-      playButton.addEventListener("click", () => playReminderAudio(voice.id, { feedback: true }));
+      playButton.addEventListener("click", () => playReminderAudio(voice.id));
 
       actions.append(playButton);
 
@@ -1599,7 +1371,6 @@ async function init() {
 
   bindEvents();
   render(true);
-  cleanupServiceWorker();
   window.setInterval(tick, 250);
 }
 
